@@ -64,7 +64,7 @@ public partial class file_list_asp : Page
             tableCell = new TableCell();
             HyperLink directoryLink = new HyperLink();
             directoryLink.Text = di.Name;
-            directoryLink.NavigateUrl = $"{HttpRuntime.AppDomainAppVirtualPath}/file_list_asp.aspx?path={folderPath}/{di.Name}";
+            directoryLink.NavigateUrl = $"{HttpRuntime.AppDomainAppVirtualPath}/file_list_asp.aspx?path={folderPath}/{di.Name.Replace("&","%26")}";
             tableCell.Controls.Add(directoryLink);
             Button deleteFolderButton = new Button();
             deleteFolderButton.Text = "刪除";
