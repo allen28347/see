@@ -1,0 +1,201 @@
+﻿@using WebMatrix.WebData
+
+@* 若您在使用組合，請移除此區段 *@
+@section Scripts {
+    <script src="~/Scripts/jquery.validate.min.js"></script>
+    <script src="~/Scripts/jquery.validate.unobtrusive.min.js"></script>
+}
+
+@{
+    WebSecurity.RequireAuthenticatedUser();
+
+    Layout = "~/_SiteLayout.cshtml";
+    Page.Title = "管理帳戶";
+
+    var action = Request.Form["action"];
+
+    bool hasLocalAccount = OAuthWebSecurity.HasLocalAccount(WebSecurity.CurrentUserId);
+
+    string successMessage = "";
+    var message = Request.QueryString["message"];
+    if (message == "ChangedPassword") {
+        successMessage = "您的密碼已經更新。";
+    } else if (message == "SetPassword") {
+        successMessage = "您已設定密碼。";
+    } else if (message == "RemovedLogin") {
+        successMessage = "已移除外部登入。";
+    }
+
+    var externalLogins =
+        (from account in OAuthWebSecurity.GetAccountsFromUserName(WebSecurity.CurrentUserName)
+         let clientData = OAuthWebSecurity.GetOAuthClientData(account.Provider)
+         select new { Provider = account.Provider, ProviderDisplayName = clientData.DisplayName, UserId = account.ProviderUserId })
+        .ToList();
+    bool canRemoveLogin = externalLogins.Count > 1 || hasLocalAccount;
+
+    // 設定驗證
+    if (hasLocalAccount) {
+        Validation.RequireField("currentPassword", "目前密碼欄位為必填。");
+        Validation.Add("currentPassword",
+            Validator.StringLength(
+                maxLength: Int32.MaxValue,
+                minLength: 6,
+                errorMessage: "目前密碼必須至少有 6 個字元"));
+    }
+    Validation.RequireField("newPassword", "新密碼欄位為必填。");
+    Validation.Add("confirmPassword",
+        Validator.Required("確認新密碼欄位為必填。"),
+        Validator.EqualsTo("newPassword", "新密碼和確認密碼不相符。"));
+    Validation.Add("newPassword",
+        Validator.StringLength(
+            maxLength: Int32.MaxValue,
+            minLength: 6,
+            errorMessage: "新密碼必須至少有 6 個字元"));
+
+    if (IsPost) {
+        AntiForgery.Validate();
+        if (action == "password") {
+            // 處理本機帳戶密碼作業
+            var currentPassword = Request.Form["currentPassword"];
+            var newPassword = Request.Form["newPassword"];
+            var confirmPassword = Request.Form["confirmPassword"];
+
+            if (Validation.IsValid()) {
+                if (hasLocalAccount) {
+                    if (WebSecurity.ChangePassword(WebSecurity.CurrentUserName, currentPassword, newPassword)) {
+                        Response.Redirect("~/Account/Manage?message=ChangedPassword");
+                        return;
+                    } else {
+                        ModelState.AddFormError("嘗試變更密碼時發生錯誤。請連絡網站的擁有者。");
+                    }
+                } else {
+                    bool requireEmailConfirmation = !WebMail.SmtpServer.IsEmpty();
+                    try {
+                        WebSecurity.CreateAccount(WebSecurity.CurrentUserName, newPassword, requireEmailConfirmation);
+                        Response.Redirect("~/Account/Manage?message=SetPassword");
+                        return;
+                    } catch (System.Web.Security.MembershipCreateUserException e) {
+                        ModelState.AddFormError(e.Message);
+                    }
+                }
+            } else {
+                ModelState.AddFormError("密碼變更失敗。請更正錯誤並再試一次。");
+            }
+        } else if (action == "removeLogin") {
+            // 移除外部登入
+            var provider = Request.Form["provider"];
+            var userId = Request.Form["userId"];
+
+            message = null;
+            var ownerAccount = OAuthWebSecurity.GetUserName(provider, userId);
+            // 如果是目前登入的使用者擁有，且不是上次登入認證的使用者，僅移除外部登入
+            if (ownerAccount == WebSecurity.CurrentUserName && canRemoveLogin) {
+                OAuthWebSecurity.DeleteAccount(provider, userId);
+                message = "RemovedLogin";
+            }
+            Response.Redirect(Href("~/Account/Manage", new { message }));
+            return;
+        } else {
+            // 假設為外部登入要求
+            string provider = Request.Form["provider"];
+            if (!provider.IsEmpty()) {
+                OAuthWebSecurity.RequestAuthentication(provider, Href("~/Account/RegisterService", new { returnUrl = Href("~/Account/Manage") }));
+                return;
+            }
+        }
+    }
+}
+<hgroup class="title">
+    <h1>@Page.Title.</h1>
+</hgroup>
+
+@if (!successMessage.IsEmpty()) {
+    <p class="message-success">
+        @successMessage
+    </p>
+}
+
+<p>您以下列身分登入 <strong>@WebSecurity.CurrentUserName</strong>.</p>
+
+@if (hasLocalAccount) {
+    <h3>變更密碼</h3>
+} else {
+    <p>
+        您沒有此網站的本機密碼。新增本機密碼，以便不透過外部登入來登入。
+    </p>
+}
+
+<form method="post">
+    @AntiForgery.GetHtml()
+    @Html.ValidationSummary(excludeFieldErrors: true)
+
+    <fieldset>
+        <legend>
+        @if (hasLocalAccount) {
+            <text>變更密碼表單</text>
+        } else {
+            <text>設定密碼表單</text>
+        }
+        </legend>
+        <ol>
+            @if (hasLocalAccount) {
+                <li class="current-password">
+                    <label for="currentPassword" @if (!ModelState.IsValidField("currentPassword")) {<text>class="error-label"</text>}>目前密碼</label>
+                    <input type="password" id="currentPassword" name="currentPassword" @Validation.For("currentPassword")/>
+                    @Html.ValidationMessage("currentPassword")
+                </li>
+            }
+            <li class="new-password">
+                <label for="newPassword" @if (!ModelState.IsValidField("newPassword")) {<text>class="error-label"</text>}>新密碼</label>
+                <input type="password" id="newPassword" name="newPassword" @Validation.For("newPassword")/>
+                @Html.ValidationMessage("newPassword")
+            </li>
+            <li class="confirm-password">
+                <label for="confirmPassword" @if (!ModelState.IsValidField("confirmPassword")) {<text>class="error-label"</text>}>確認新密碼</label>
+                <input type="password" id="confirmPassword" name="confirmPassword" @Validation.For("confirmPassword")/>
+                @Html.ValidationMessage("confirmPassword")
+            </li>
+        </ol>
+        @if (hasLocalAccount) {
+            <button type="submit" name="action" value="password">變更密碼</button>
+            <p>
+                如果您忘記密碼，按一下<a href="~/Account/ForgotPassword" title="忘記密碼頁面">這裡</a>。
+            </p>
+        } else {
+            <button type="submit" name="action" value="password">設定密碼</button>
+        }
+    </fieldset>
+</form>
+
+<section id="externalLogins">
+    @if (externalLogins.Count > 0) {
+        <h3>註冊的外部登入</h3>
+        <table>
+            <tbody>
+            @foreach (var externalLogin in externalLogins) {
+                <tr>
+                    <td>@externalLogin.ProviderDisplayName</td>
+                    <td>
+                        @if (canRemoveLogin) {
+                            <form method="post">
+                                @AntiForgery.GetHtml()
+                                <fieldset>
+                                    <legend></legend>
+                                    <input type="hidden" name="provider" value="@externalLogin.Provider" />
+                                    <input type="hidden" name="userId" value="@externalLogin.UserId" />
+                                    <button type="submit" name="action" value="removeLogin" title="移除此 @externalLogin.ProviderDisplayName 驗證，從您的帳戶">移除</button>
+                                </fieldset>
+                            </form>
+                        } else {
+                            @: &nbsp;
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+
+    <h3>新增外部登入</h3>
+    @RenderPage("~/Account/_ExternalLoginsList.cshtml")
+</section>

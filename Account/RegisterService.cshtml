@@ -1,0 +1,113 @@
+﻿@* 若您在使用組合，請移除此區段 *@
+@section Scripts {
+    <script src="~/Scripts/jquery.validate.min.js"></script>
+    <script src="~/Scripts/jquery.validate.unobtrusive.min.js"></script>
+}
+
+@{
+    Layout = "~/_SiteLayout.cshtml";
+    Page.Title = "註冊";
+
+    string email = "";
+    string loginData = "";
+    string providerDisplayName = "";
+
+    var returnUrl = Request.QueryString["ReturnUrl"];
+    if (returnUrl.IsEmpty()) {
+        // 某些外部登入提供者一律需要回傳 URL 值
+        returnUrl = Href("~/");
+    }
+
+    // 設定驗證
+    Validation.RequireField("email", "使用者名稱欄位為必填。");
+
+    if (IsPost && Request.Form["newAccount"].AsBool()) {
+        // 處理新帳戶註冊表單
+        AntiForgery.Validate();
+        email = Request.Form["email"];
+        loginData = Request.Form["loginData"];
+
+        string provider = "";
+        string providerUserId = "";
+        if (WebSecurity.IsAuthenticated || !OAuthWebSecurity.TryDeserializeProviderUserId(loginData, out provider, out providerUserId)) {
+            Response.Redirect("~/Account/Manage");
+            return;
+        }
+
+        providerDisplayName = OAuthWebSecurity.GetOAuthClientData(provider).DisplayName;
+        if (Validation.IsValid()) {
+            // 將新使用者插入資料庫
+            var db = Database.Open("StarterSite");
+
+            // 檢查使用者是否己存在
+            var user = db.QuerySingle("SELECT Email FROM UserProfile WHERE LOWER(Email) = LOWER(@0)", email);
+            if (user == null) {
+                // 將電子郵件插入設定檔資料表
+                db.Execute("INSERT INTO UserProfile (Email) VALUES (@0)", email);
+                OAuthWebSecurity.CreateOrUpdateAccount(provider, providerUserId, email);
+
+                OAuthWebSecurity.Login(provider, providerUserId, createPersistentCookie: false);
+
+                Context.RedirectLocal(returnUrl);
+                return;
+            } else {
+                ModelState.AddError("email", "使用者已經存在請輸入不同的使用者名稱。");
+            }
+        }
+    } else {
+        // 從外部登入提供者處理回呼
+
+        var result = OAuthWebSecurity.VerifyAuthentication(Href("~/Account/RegisterService", new { returnUrl }));
+        if (result.IsSuccessful) {
+            bool registered = OAuthWebSecurity.Login(result.Provider, result.ProviderUserId, createPersistentCookie: false);
+            if (registered) {
+                Context.RedirectLocal(returnUrl);
+                return;
+            }
+
+            if (WebSecurity.IsAuthenticated) {
+                // 如果目前使用者已登入，請新增新帳戶
+                OAuthWebSecurity.CreateOrUpdateAccount(result.Provider, result.ProviderUserId, WebSecurity.CurrentUserName);
+                Context.RedirectLocal(returnUrl);
+                return;
+            } else {
+                // 若為新使用者，請設定預設使用者名稱為從外部登入提供者取得的值
+                email = result.UserName;
+                loginData = OAuthWebSecurity.SerializeProviderUserId(result.Provider, result.ProviderUserId);
+                providerDisplayName = OAuthWebSecurity.GetOAuthClientData(result.Provider).DisplayName;
+            }
+        } else {
+            Response.Redirect("~/Account/ExternalLoginFailure");
+            return;
+        }
+    }
+}
+<hgroup class="title">
+    <h1>@Page.Title.</h1>
+    <h2>關聯您的 @providerDisplayName 帳戶。</h2>
+</hgroup>
+
+<form method="post">
+    @AntiForgery.GetHtml()
+    <input type="hidden" name="loginData" value="@loginData" />
+    @* 如果至少有一個驗證錯誤存在，請通知使用者 *@
+    @Html.ValidationSummary(excludeFieldErrors: true)
+
+    <fieldset>
+        <legend>註冊表單</legend>
+        <p>
+            您已經成功驗證，使用 <strong>@providerDisplayName</strong>. 請
+            為以下網站輸入使用者名稱，再按一下 [確認] 按鈕以結束登入
+            。
+        </p>
+        <ol>
+            <li class="email">
+                <label for="email" @if (!ModelState.IsValidField("email")) {<text>class="error-label"</text>}>電子郵件地址</label>
+                <input type="text" id="email" name="email" value="@email" @Validation.For("email") />
+                @* 將任何電子郵件驗證錯誤寫入頁面 *@
+                @Html.ValidationMessage("email")
+            </li>
+        </ol>
+        <button type="submit" name="newAccount" value="true">註冊</button>
+    </fieldset>
+</form>

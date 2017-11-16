@@ -1,0 +1,104 @@
+﻿@* 若您在使用組合，請移除此區段 *@
+@section Scripts {
+    <script src="~/Scripts/jquery.validate.min.js"></script>
+    <script src="~/Scripts/jquery.validate.unobtrusive.min.js"></script>
+}
+
+@{
+    Layout = "~/_SiteLayout.cshtml";
+    Page.Title = "登入";
+
+    // 初始化一般頁面變數
+    var email = "";
+    var password = "";
+    var rememberMe = false;
+
+    var returnUrl = Request.QueryString["ReturnUrl"];
+    if (returnUrl.IsEmpty()) {
+        // 某些外部登入提供者一律需要回傳 URL 值
+        returnUrl = Href("~/");
+    }
+
+    // Setup validation
+    Validation.RequireField("email", "您必須指定電子郵件地址。");
+    Validation.RequireField("password", "您必須指定密碼。");
+    Validation.Add("password",
+        Validator.StringLength(
+            maxLength: Int32.MaxValue,
+            minLength: 6,
+            errorMessage: "密碼必須至少有 6 個字元"));
+
+    // 若為 POST 要求，驗證並處理資料
+    if (IsPost) {
+        AntiForgery.Validate();
+        // 是外部登入要求嗎？
+        string provider = Request.Form["provider"];
+        if (!provider.IsEmpty()) {
+            OAuthWebSecurity.RequestAuthentication(provider, Href("~/Account/RegisterService", new { returnUrl }));
+            return;
+        } else if (Validation.IsValid()) {
+            email = Request.Form["email"];
+            password = Request.Form["password"];
+            rememberMe = Request.Form["rememberMe"].AsBool();
+
+            if (WebSecurity.UserExists(email) && WebSecurity.GetPasswordFailuresSinceLastSuccess(email) > 4 && WebSecurity.GetLastPasswordFailureDate(email).AddSeconds(60) > DateTime.UtcNow) {
+                Response.Redirect("~/Account/AccountLockedOut");
+                return;
+            }
+
+            // 嘗試使用提供的認證登入
+            if (WebSecurity.Login(email, password, rememberMe)) {
+                Context.RedirectLocal(returnUrl);
+                return;
+            } else {
+                ModelState.AddFormError("使用者名稱或提供的密碼不正確。");
+            }
+        }
+    }
+}
+
+<hgroup class="title">
+    <h1>@Page.Title.</h1>
+</hgroup>
+
+<section id="loginForm">
+    <h2>使用本機帳戶登入。</h2>
+    <form method="post">
+        @AntiForgery.GetHtml()
+        @* 若一或多個驗證錯誤存在，則顯示錯誤 *@
+        @Html.ValidationSummary("登入失敗。請更正錯誤並再試一次.", excludeFieldErrors: true, htmlAttributes: null)
+
+        <fieldset>
+            <legend>登入您的帳戶</legend>
+            <ol>
+                <li class="email">
+                    <label for="email" @if (!ModelState.IsValidField("email"))
+                                       {<text>class="error-label"</text>}>電子郵件地址</label>
+                    <input type="text" id="email" name="email" value="@email" @Validation.For("email")/>
+                    @* 將任何使用者名稱驗證錯誤寫入頁面 *@
+                    @Html.ValidationMessage("email")
+                </li>
+                <li class="password">
+                    <label for="password" @if (!ModelState.IsValidField("password")) {<text>class="error-label"</text>}>密碼</label>
+                    <input type="password" id="password" name="password" @Validation.For("password")/>
+                    @* 將任何密碼驗證錯誤寫入頁面 *@
+                    @Html.ValidationMessage("password")
+                </li>
+                <li class="remember-me">
+                    <input type="checkbox" id="rememberMe" name="rememberMe" value="true" checked="@rememberMe" />
+                    <label class="checkbox" for="rememberMe">記住我？</label>
+                </li>
+            </ol>
+            <input type="submit" value="登入" />
+        </fieldset>
+    </form>
+    <p>
+        <a href="~/Account/Register">沒有帳戶嗎？</a>
+        <a href="~/Account/ForgotPassword">忘記您的密碼嗎?</a>
+    </p>
+</section>
+
+<section class="social" id="socialLoginForm">
+    <h2>使用另一個服務以登入.</h2>
+    @RenderPage("~/Account/_ExternalLoginsList.cshtml")
+</section>

@@ -1,0 +1,38 @@
+﻿@{
+    Layout = "~/_SiteLayout.cshtml";
+    Page.Title = "註冊確認頁";
+
+    string message = "";
+    var confirmationToken = Request["confirmationCode"];
+
+    WebSecurity.Logout();
+    if (!confirmationToken.IsEmpty()) {
+        if (WebSecurity.ConfirmAccount(confirmationToken)) {
+            message = "註冊已確認! 請按一下 [登入] 索引標籤登入網站。";
+        } else {
+            message = "無法確認您的註冊資訊。";
+        }
+    }
+}
+
+<hgroup class="title">
+    <h1>@Page.Title.</h1>
+    <h2>使用下面的表單確認您的帳戶。</h2>
+</hgroup>
+
+@if (!message.IsEmpty()) {
+    <p>@message</p>
+} else {
+    <form method="post">
+        <fieldset>
+            <legend>確認碼</legend>
+            <ol>
+                <li>
+                    <label for="confirmationCode">確認碼</label>
+                    <input type="text" id="confirmationCode" name="confirmationCode" />
+                </li>
+            </ol>
+            <input type="submit" value="確認" />
+        </fieldset>
+    </form>
+}

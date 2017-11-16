@@ -1,0 +1,17 @@
+﻿@{
+    WebSecurity.RequireAuthenticatedUser();
+
+    if (IsPost) {
+        // 確認使用者已提交要求
+        AntiForgery.Validate();
+
+        // 登出目前使用者內容
+        WebSecurity.Logout();
+
+        // 重新導向回到傳回 URL 或首頁
+        var returnUrl = Request.QueryString["ReturnUrl"];
+        Context.RedirectLocal(returnUrl);
+    } else {
+        Response.Redirect("~/");
+    }
+}

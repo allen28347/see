@@ -1,0 +1,25 @@
+﻿@{
+    // 設定版面配置頁和頁面標題
+    Layout = "~/_SiteLayout.cshtml";
+    Page.Title = "感謝您的註冊";
+}
+
+@if (!WebSecurity.IsAuthenticated) {
+    <hgroup class="title">
+        <h1>@Page.Title.</h1>
+        <h2>但是您尚未完成!</h2>
+    </hgroup>
+
+    <p>
+       即將傳送說明如何啟動帳戶的電子郵件給您。
+    </p>
+} else {
+    <hgroup class="title">
+        <h1>@Page.Title.</h1>
+        <h2>您已就緒。</h2>
+    </hgroup>
+
+    <p>
+        看來您已經確認您的帳戶，並且已準備就緒。
+    </p>
+}

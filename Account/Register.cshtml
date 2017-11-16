@@ -1,0 +1,135 @@
+﻿@* 若您在使用繫結，請移除此區段 *@
+@section Scripts {
+    <script src="~/Scripts/jquery.validate.min.js"></script>
+    <script src="~/Scripts/jquery.validate.unobtrusive.min.js"></script>
+}
+
+@{
+    Layout = "~/_SiteLayout.cshtml";
+    Page.Title = "註冊";
+
+    // 初始化一般頁面變數
+    var email = "";
+    var password = "";
+    var confirmPassword = "";
+
+    // 設定驗證
+Validation.RequireField("email", "您必須指定一個電子郵件地址.");
+    Validation.RequireField("password", "密碼不能為空白.");
+    Validation.Add("confirmPassword",
+        Validator.EqualsTo("password", "密碼和確認密碼不相符."));
+    Validation.Add("password",
+        Validator.StringLength(
+            maxLength: Int32.MaxValue,
+            minLength: 6,
+            errorMessage: "密碼必須至少 6 個字元"));
+
+    // 若這是POST 要求，請驗證並處理資料
+    if (IsPost) {
+        AntiForgery.Validate();
+        email = Request.Form["email"];
+        password = Request.Form["password"];
+        confirmPassword = Request.Form["confirmPassword"];
+
+        // 驗證使用者的 captcha 回應
+        // if (!ReCaptcha.Validate("PRIVATE_KEY")) {
+        //     ModelState.AddError("recaptcha", "Captcha 回應不正確");
+        // }
+
+        // 如果所有資訊都有效，請建立一個新帳戶
+        if (Validation.IsValid()) {
+            // 插入新使用者至資料庫
+            var db = Database.Open("StarterSite");
+
+            // 檢查是否使用者已存在
+            var user = db.QuerySingle("SELECT Email FROM UserProfile WHERE LOWER(Email) = LOWER(@0)", email);
+            if (user == null) {
+                // 插入電子郵件至設定檔資料表
+                db.Execute("INSERT INTO UserProfile (Email) VALUES (@0)", email);
+
+// 在會員資料庫中建立並關聯新項目。
+// 若成功，繼續處理要求
+                try {
+                    bool requireEmailConfirmation = !WebMail.SmtpServer.IsEmpty();
+                    var token = WebSecurity.CreateAccount(email, password, requireEmailConfirmation);
+                    if (requireEmailConfirmation) {
+                        var hostUrl = Request.Url.GetComponents(UriComponents.SchemeAndServer, UriFormat.Unescaped);
+                        var confirmationUrl = hostUrl + VirtualPathUtility.ToAbsolute("~/Account/Confirm?confirmationCode=" + HttpUtility.UrlEncode(token));
+
+                        WebMail.Send(
+                            to: email,
+subject: "請確認您的帳戶",
+                            body: "您的確認代碼為: " + token + ". Visit <a href=\"" + confirmationUrl + "\">" + confirmationUrl + "</a> 以啟用您的帳戶."
+                        );
+                    }
+
+                    if (requireEmailConfirmation) {
+                        // 感謝使用者註冊，並讓他們知道已寄出電子郵件
+                        Response.Redirect("~/Account/Thanks");
+                    } else {
+                        // 巡覽回到首頁並結束
+                        WebSecurity.Login(email, password);
+
+                        Response.Redirect("~/");
+                    }
+                } catch (System.Web.Security.MembershipCreateUserException e) {
+                    ModelState.AddFormError(e.Message);
+                }
+            } else {
+// 使用者已經存在
+                ModelState.AddFormError("Email address is already in use.");
+            }
+        }
+    }
+}
+
+<hgroup class="title">
+    <h1>@Page.Title.</h1>
+<h2>建立新帳戶.</h2>
+</hgroup>
+
+<form method="post">
+    @AntiForgery.GetHtml()
+@* 如果至少有一個驗證錯誤存在，請通知使用者 *@
+@Html.ValidationSummary("未成功建立帳戶。請更正錯誤並再試一次.", excludeFieldErrors: true, htmlAttributes: null)
+
+    <fieldset>
+<legend>註冊表</legend>
+        <ol>
+            <li class="email">
+<label for="email" @if(!ModelState.IsValidField("email")){<text>class="error-label"</text>}>電子郵件地址</label>
+                <input type="text" id="email" name="email" value="@email" @Validation.For("email") />
+@* 將任何電子郵件驗證錯誤寫入頁面 *@
+                @Html.ValidationMessage("email")
+            </li>
+            <li class="password">
+<label for="password" @if(!ModelState.IsValidField("password")) {<text>class="error-label"</text>}>密碼</label>
+                <input type="password" id="password" name="password" @Validation.For("password") />
+                @* 將任何密碼驗證錯誤寫入頁面 *@
+                @Html.ValidationMessage("password")
+            </li>
+            <li class="confirm-password">
+<label for="confirmPassword" @if(!ModelState.IsValidField("confirmPassword")) {<text>class="error-label"</text>}>確認密碼</label>
+                <input type="password" id="confirmPassword" name="confirmPassword" @Validation.For("confirmPassword") />
+                @* 將任何密碼驗證錯誤寫入頁面 *@
+                @Html.ValidationMessage("confirmPassword")
+            </li>
+            <li class="recaptcha">
+                <div class="message-info">
+                    <p>
+若要啟用CAPTCHA 驗證, <a href="http://go.microsoft.com/fwlink/?LinkId=204140">安裝 
+ASP.NET Web Helpers Library</a> 並取消註解ReCaptcha.GetHtml 並將 'PUBLIC_KEY'
+取代為您的公開金鑰。在這個頁面的頂端，取消註解ReCaptcha. Validate 並
+將'PRIVATE_KEY' 取代為您的私密金鑰。
+註冊reCAPTCHA 金鑰 (在 <a href="http://recaptcha.net">reCAPTCHA.net</a>.
+                    </p>
+                </div>
+                @*
+                @ReCaptcha.GetHtml("PUBLIC_KEY", theme: "white")
+                @Html.ValidationMessage("recaptcha")
+                *@
+            </li>
+        </ol>
+        <input type="submit" value="註冊" />
+    </fieldset>
+</form>

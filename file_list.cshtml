@@ -1,0 +1,37 @@
+﻿<!DOCTYPE html>
+<meta name="viewport" content="width=device-width; initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>通用檔案抓取</title>
+</head>
+<body>
+	<h1>檔案清單</h1>
+    @{ 
+        string fn = HttpContext.Current.Request.QueryString["path"] ?? "/file";
+        <h3>路徑: @fn</h3>
+    }
+	<table border="1" >
+	@{
+        try
+        {
+
+                <tr><th>檔名</th></tr>
+            DirectoryInfo DI = new DirectoryInfo(Server.MapPath("~") + fn);
+            foreach (DirectoryInfo di in DI.GetDirectories())
+            {
+                <tr><th><a href="@HttpRuntime.AppDomainAppVirtualPath/file_list.cshtml?path=@fn/@di.Name">@di.Name</a></th></tr>
+            }
+            foreach (FileInfo FI in DI.GetFiles())
+            {
+                <tr><th><a href="@HttpRuntime.AppDomainAppVirtualPath@fn/@FI.Name">@FI.Name</a><button onclick="location.href='download.aspx?name=@FI.Name&path=@fn/@FI.Name'">下載</button></th></tr>
+            }
+        }
+        catch (DirectoryNotFoundException dnfe)
+        {
+                <tr><th>異常:@dnfe</th></tr>
+        }
+	}
+	</table>
+</body>
+</html>
