@@ -148,8 +148,8 @@ public partial class file_list_asp : Page
     {
         if (FileUpload.HasFiles)
         {
-            foreach(HttpPostedFile upFile in FileUpload.PostedFiles)
-                upFile.SaveAs($"{HttpRuntime.AppDomainAppPath}\\{rootPath}{folderPath}\\{upFile.FileName}");
+            foreach (HttpPostedFile upFile in FileUpload.PostedFiles)
+                upFile.SaveAs($"{HttpRuntime.AppDomainAppPath}{rootPath}{folderPath}\\{upFile.FileName}");
         }
         Response.Redirect(Request.Url.ToString());
     }
@@ -167,7 +167,7 @@ public partial class file_list_asp : Page
         {
             try
             {
-                new DirectoryInfo($"{HttpRuntime.AppDomainAppPath}\\{rootPath}{folderPath}\\{folderName.Text}").Create();
+                new DirectoryInfo($"{HttpRuntime.AppDomainAppPath}{rootPath}{folderPath}\\{folderName.Text}").Create();
                 Response.Redirect(Request.Url.ToString());
             }catch(Exception err)
             {
