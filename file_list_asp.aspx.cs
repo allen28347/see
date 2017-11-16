@@ -64,7 +64,7 @@ public partial class file_list_asp : Page
             tableCell = new TableCell();
             HyperLink directoryLink = new HyperLink();
             directoryLink.Text = di.Name;
-            directoryLink.NavigateUrl = $"{HttpRuntime.AppDomainAppVirtualPath}/file_list_asp.aspx?path={folderPath}/{di.Name.Replace("&","%26")}";
+            directoryLink.NavigateUrl = $"{HttpRuntime.AppDomainAppVirtualPath}/file_list_asp.aspx?path={folderPath.Replace("&", "%26")}/{di.Name.Replace("&","%26")}";
             tableCell.Controls.Add(directoryLink);
             Button deleteFolderButton = new Button();
             deleteFolderButton.Text = "刪除";
@@ -158,7 +158,7 @@ public partial class file_list_asp : Page
     {
         DirectoryInfo folder = new DirectoryInfo(Server.MapPath("~") + @"\" +rootPath + folderPath);
         Response.Redirect(
-            $"{HttpRuntime.AppDomainAppVirtualPath}/file_list_asp.aspx?path={new Regex($"^(.*?)[/\\\\]{Regex.Escape(folder.Name)}[/\\\\]?$").Replace(folderPath,"$1")}");
+            $"{HttpRuntime.AppDomainAppVirtualPath}/file_list_asp.aspx?path={new Regex($"^(.*?)[/\\\\]{Regex.Escape(folder.Name)}[/\\\\]?$").Replace(folderPath,"$1").Replace("&", "%26")}");
     }
 
     protected void createFolder_Click(object sender, EventArgs e)
