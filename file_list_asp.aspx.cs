@@ -184,7 +184,8 @@ public partial class file_list_asp : Page
 
     protected void ok_Click(object sender, EventArgs e)
     {
-        if (messageBox.Attributes["ActionMode"] !=null)
+        if (messageBox.Attributes["ActionMode"] != null)
+        {
             switch (Convert.ToInt32(messageBox.Attributes["ActionMode"]))
             {
                 case ActionMode.DELETE_FILE:
@@ -194,7 +195,8 @@ public partial class file_list_asp : Page
                         file.Delete();
                         Response.Redirect(Request.Url.ToString());
                     }
-                    catch (Exception err){
+                    catch (Exception err)
+                    {
                         message.Text = $"檔案刪除失敗，{err.Message}";
                         messageBox.GroupingText = "錯誤";
                         messageBox.Visible = true;
@@ -215,11 +217,14 @@ public partial class file_list_asp : Page
                     }
                     break;
             }
+            message.Attributes.Remove("ActionMode");
+        }
         messageBox.Visible = false;
     }
 
     protected void cancel_Click(object sender, EventArgs e)
     {
+        message.Attributes.Remove("ActionMode");
         messageBox.Visible = false;
     }
 }
