@@ -12,7 +12,7 @@ public partial class file_list_asp : Page
         get { return fn != "/" ? fn : ""; }
         set { fn = value != @"\" ? value : "/"; }
     }
-    static class ActionMode { public const int DELETE_FILE = 0, DELETE_FOLDER = 1; };
+    static class ActionMode { public const int OTHER = -1,DELETE_FILE = 0, DELETE_FOLDER = 1; };
     const string rootPath = "file";
     protected void Page_Load(object sender, EventArgs e)
     {
@@ -22,11 +22,13 @@ public partial class file_list_asp : Page
             }else if(Regex.IsMatch(Request.QueryString["path"],"^.*\\.\\..*$")){
                 message.Text = "路徑中不允許包含'..'";
                 messageBox.GroupingText="錯誤";
+                messageBox.Attributes.Add("ActionMode", ActionMode.OTHER.ToString());
                 messageBox.Visible = true;
                 folderPath="/";
             }else if(!new DirectoryInfo(Server.MapPath("~") + $"\\{rootPath}\\{Request.QueryString["path"]}").Exists){
                 message.Text = $"路徑'{Request.QueryString["path"]}'不存在";
                 messageBox.GroupingText="錯誤";
+                messageBox.Attributes.Add("ActionMode", ActionMode.OTHER.ToString());
                 messageBox.Visible = true;
                 folderPath="/";
             }else
@@ -173,58 +175,58 @@ public partial class file_list_asp : Page
             {
                 message.Text = $"資料夾建立失敗，{err.Message}";
                 messageBox.GroupingText = "錯誤";
+                messageBox.Attributes.Add("ActionMode", ActionMode.OTHER.ToString());
                 messageBox.Visible = true;
             }
         }else{
             message.Text = "資料夾名稱不可以為空白";
             messageBox.GroupingText="錯誤";
+            messageBox.Attributes.Add("ActionMode", ActionMode.OTHER.ToString());
             messageBox.Visible = true;
         }
     }
 
     protected void ok_Click(object sender, EventArgs e)
     {
-        if (messageBox.Attributes["ActionMode"] != null)
+
+        switch (Convert.ToInt32(messageBox.Attributes["ActionMode"]))
         {
-            switch (Convert.ToInt32(messageBox.Attributes["ActionMode"]))
-            {
-                case ActionMode.DELETE_FILE:
-                    FileInfo file = new FileInfo(HttpRuntime.AppDomainAppPath + $"\\{rootPath}{folderPath}\\" + messageBox.Attributes["fileName"]);
-                    try
-                    {
-                        file.Delete();
-                        Response.Redirect(Request.Url.ToString());
-                    }
-                    catch (Exception err)
-                    {
-                        message.Text = $"檔案刪除失敗，{err.Message}";
-                        messageBox.GroupingText = "錯誤";
-                        messageBox.Visible = true;
-                    }
-                    break;
-                case ActionMode.DELETE_FOLDER:
-                    DirectoryInfo directory = new DirectoryInfo(HttpRuntime.AppDomainAppPath + $"\\{rootPath}{folderPath}\\" + messageBox.Attributes["directoryName"]);
-                    try
-                    {
-                        DeleteFolder(directory);
-                        Response.Redirect(Request.Url.ToString());
-                    }
-                    catch (Exception err)
-                    {
-                        message.Text = $"資料夾刪除失敗，{err.Message}";
-                        messageBox.GroupingText = "錯誤";
-                        messageBox.Visible = true;
-                    }
-                    break;
-            }
-            message.Attributes.Remove("ActionMode");
+            case ActionMode.DELETE_FILE:
+                FileInfo file = new FileInfo(HttpRuntime.AppDomainAppPath + $"\\{rootPath}{folderPath}\\" + messageBox.Attributes["fileName"]);
+                try
+                {
+                    file.Delete();
+                    Response.Redirect(Request.Url.ToString());
+                }
+                catch (Exception err)
+                {
+                    message.Text = $"檔案刪除失敗，{err.Message}";
+                    messageBox.GroupingText = "錯誤";
+                    messageBox.Attributes.Add("ActionMode", ActionMode.OTHER.ToString());
+                    messageBox.Visible = true;
+                }
+                break;
+            case ActionMode.DELETE_FOLDER:
+                DirectoryInfo directory = new DirectoryInfo(HttpRuntime.AppDomainAppPath + $"\\{rootPath}{folderPath}\\" + messageBox.Attributes["directoryName"]);
+                try
+                {
+                    DeleteFolder(directory);
+                    Response.Redirect(Request.Url.ToString());
+                }
+                catch (Exception err)
+                {
+                    message.Text = $"資料夾刪除失敗，{err.Message}";
+                    messageBox.GroupingText = "錯誤";
+                    messageBox.Attributes.Add("ActionMode", ActionMode.OTHER.ToString());
+                    messageBox.Visible = true;
+                }
+                break;
         }
         messageBox.Visible = false;
     }
 
     protected void cancel_Click(object sender, EventArgs e)
     {
-        message.Attributes.Remove("ActionMode");
         messageBox.Visible = false;
     }
 }
